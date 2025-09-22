@@ -1,0 +1,12 @@
+{
+    "allowed_paths": [
+        "/data/local/tmp",
+        "/tmp",
+        "/sdcard"
+    ],
+    "allowed_uids": [1000],
+    "allowed_gids": [1000],
+    "can_mount": false,
+    "can_network": true,
+    "log_level": "debug"
+}

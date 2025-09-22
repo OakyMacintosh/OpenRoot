@@ -1,0 +1,15 @@
+{
+  "name": "openroot",
+  "version": "0.1.0",
+  "description": "A cross-unix root emulation solution",
+  "dependencies": [
+    {
+      "name": "nlohmann-json",
+      "version>=": "3.11.2"
+    },
+    {
+      "name": "spdlog",
+      "version>=": "1.12.0"
+    }
+  ]
+}
