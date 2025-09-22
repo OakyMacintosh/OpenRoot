@@ -1,0 +1,102 @@
+name: Debug Build
+
+on:
+  push:
+    branches: [ "main", "dev" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:  # Allow manual trigger
+
+env:
+  BUILD_TYPE: Debug
+
+jobs:
+  build-rootd:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: 'recursive'
+
+    - name: Install Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake ninja-build
+        sudo apt-get install -y libspdlog-dev nlohmann-json3-dev
+
+    - name: Configure CMake
+      run: cmake -B build -S . -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}
+
+    - name: Build
+      run: cmake --build build --config ${{ env.BUILD_TYPE }}
+
+    - name: Package rootd
+      run: |
+        cd build
+        tar czf OpenRoot-rootd-linux.tar.gz rootd
+
+    - name: Upload rootd artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: rootd-linux
+        path: build/OpenRoot-rootd-linux.tar.gz
+
+  build-android:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up JDK
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    - name: Build Debug APK
+      run: |
+        cd droid-chan
+        chmod +x gradlew
+        ./gradlew assembleDebug --stacktrace
+
+    - name: Upload APK artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: droid-chan-debug
+        path: droid-chan/app/build/outputs/apk/debug/*.apk
+
+  create-release:
+    needs: [build-rootd, build-android]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')
+
+    steps:
+    - uses: actions/download-artifact@v3
+
+    - name: Get current date
+      id: date
+      run: echo "date=$(date +'%Y%m%d')" >> $GITHUB_OUTPUT
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: debug-${{ steps.date.outputs.date }}
+        name: Debug Build ${{ steps.date.outputs.date }}
+        body: |
+          🧪 Debug build from ${{ github.ref_name }} branch
+          
+          **Note**: This is an unsigned debug build for testing purposes.
+          
+          Build triggered by: ${{ github.event.head_commit.message }}
+          Commit: ${{ github.sha }}
+          
+          ## Downloads
+          - rootd daemon (Linux)
+          - Droid-Chan APK (Debug/Unsigned)
+        files: |
+          rootd-linux/*.tar.gz
+          droid-chan-debug/*.apk
+        prerelease: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
