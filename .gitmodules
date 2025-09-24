@@ -1,0 +1,3 @@
+[submodule "rootd/include/spdlog"]
+	path = rootd/include/spdlog
+	url = https://github.com/gabime/spdlog.git
