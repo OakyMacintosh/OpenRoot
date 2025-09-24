@@ -10,6 +10,7 @@ import java.io.IOException;
 public class RootdService extends Service {
     private static final String TAG = "RootdService";
     private static final String ROOTD_DIR = "/data/data/me.openroot/rootd";
+    private static final String SYSTEM_DIR = "/system";
     private Process rootdProcess;
 
     @Override

@@ -1,22 +1,3 @@
-#ifndef defined(__ANDROID__)
-   #include <android/log.h>
-   #include <android/device.h>
-#endif
-
-#ifndef defined(__LINUX__)
-   #include <linux/kernel.h>
-#endif
-
-#if defined(__WINDOWS__)
-   #include <windows.h>
-
-   int WinMain(int argc, char **argv) {
-        printf("Sorry, but on Windows we don't have root users or similar system structures.\n");
-        printf("rootd is not supported on Windows.\n");
-        return 1;
-   }
-#endif
-
 #include <iostream>
 #include <string>
 #include <thread>
@@ -33,11 +14,10 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <json/json.hpp> // Using nlohmann/json for JSON handling
-#include <spdlog/spdlog.h> // Using spdlog for logging
+#include <fstream>
 #include <signal.h>
 
 namespace fs = std::filesystem;
-namespace std = std;
 using json = nlohmann::json;
 
 // Constants
@@ -75,16 +55,10 @@ private:
     std::map<pid_t, EmulatedPermissions> process_perms;
     int socket_fd;
     bool running;
-    std::shared_ptr<spdlog::logger> logger;
+    std::ofstream logfile;
     json config;
     
 public:
-    RootEmulator() {
-        // Default allowed operations for emulated root
-        perms.allowed_paths.insert("/data/local/tmp");  // Common path for testing
-        perms.allowed_paths.insert(fs::temp_directory_path().string());
-    }
-
     bool can_access_path(const std::string& path, int access_mode) {
         // Check if path or its parent directory is in allowed_paths
         for (const auto& allowed : perms.allowed_paths) {
@@ -130,7 +104,7 @@ public:
     bool init_socket() {
         socket_fd = socket(AF_UNIX, SOCK_STREAM, 0);
         if (socket_fd < 0) {
-            logger->error("Failed to create socket: {}", strerror(errno));
+            logfile << "[ERROR] Failed to create socket: " << strerror(errno) << std::endl;
             return false;
         }
 
@@ -143,13 +117,13 @@ public:
         unlink(ROOTD_SOCKET_PATH);
 
         if (bind(socket_fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
-            logger->error("Failed to bind socket: {}", strerror(errno));
+            logfile << "[ERROR] Failed to bind socket: " << strerror(errno) << std::endl;
             close(socket_fd);
             return false;
         }
 
         if (listen(socket_fd, 5) < 0) {
-            logger->error("Failed to listen on socket: {}", strerror(errno));
+            logfile << "[ERROR] Failed to listen on socket: " << strerror(errno) << std::endl;
             close(socket_fd);
             return false;
         }
@@ -164,11 +138,11 @@ public:
         std::string fs_type = params["type"];
         
         if (!perms.can_mount) {
-            logger->warn("Mount operation denied for {} -> {}", source, target);
+            logfile << "[WARN] Mount operation denied for " << source << " -> " << target << std::endl;
             return false;
         }
 
-        logger->info("Emulating mount: {} -> {} ({})", source, target, fs_type);
+        logfile << "[INFO] Emulating mount: " << source << " -> " << target << " (" << fs_type << ")" << std::endl;
         // Simulate mount success without actually mounting
         return true;
     }
@@ -176,12 +150,12 @@ public:
     // Handle network configuration
     bool handle_network_config(const json& params) {
         if (!perms.can_network) {
-            logger->warn("Network configuration denied");
+            logfile << "[WARN] Network configuration denied" << std::endl;
             return false;
         }
 
         std::string operation = params["operation"];
-        logger->info("Emulating network operation: {}", operation);
+        logfile << "[INFO] Emulating network operation: " << operation << std::endl;
         return true;
     }
 
@@ -195,24 +169,24 @@ public:
                 // Apply configuration
                 if (config.contains("allowed_paths")) {
                     for (const auto& path : config["allowed_paths"]) {
-                        perms.allowed_paths.insert(path);
+                        perms.allowed_paths.insert(path.get<std::string>());
                     }
                 }
                 
                 if (config.contains("allowed_uids")) {
                     for (const auto& uid : config["allowed_uids"]) {
-                        perms.allowed_uids.insert(uid);
+                        perms.allowed_uids.insert(uid.get<uid_t>());
                     }
                 }
 
                 perms.can_mount = config.value("can_mount", false);
                 perms.can_network = config.value("can_network", false);
                 
-                logger->info("Configuration loaded successfully");
+                logfile << "[INFO] Configuration loaded successfully" << std::endl;
                 return true;
             }
         } catch (const std::exception& e) {
-            logger->error("Failed to load configuration: {}", e.what());
+            logfile << "[ERROR] Failed to load configuration: " << e.what() << std::endl;
         }
         return false;
     }
@@ -223,7 +197,7 @@ public:
         while (running) {
             int client_fd = accept(socket_fd, nullptr, nullptr);
             if (client_fd < 0) {
-                logger->error("Failed to accept connection: {}", strerror(errno));
+                logfile << "[ERROR] Failed to accept connection: " << strerror(errno) << std::endl;
                 continue;
             }
 
@@ -237,7 +211,7 @@ public:
                         json request = json::parse(buffer);
                         handle_request(request, client_fd);
                     } catch (const std::exception& e) {
-                        logger->error("Failed to parse request: {}", e.what());
+                        logfile << "[ERROR] Failed to parse request: " << e.what() << std::endl;
                     }
                 }
                 close(client_fd);
@@ -282,12 +256,15 @@ public:
 public:
     RootEmulator() : running(false) {
         // Initialize logger
-        logger = spdlog::basic_logger_mt("rootd", ROOTD_LOG_PATH);
-        logger->set_level(spdlog::level::debug);
+        logfile.open(ROOTD_LOG_PATH, std::ios::app);
+        
+        // Default allowed operations for emulated root
+        perms.allowed_paths.insert("/data/local/tmp");  // Common path for testing
+        perms.allowed_paths.insert(fs::temp_directory_path().string());
         
         // Load configuration
         if (!load_config()) {
-            logger->warn("Using default configuration");
+            logfile << "[WARN] Using default configuration" << std::endl;
         }
 
         // Initialize IPC socket
@@ -305,13 +282,13 @@ public:
 
     // Start the emulator
     void start() {
-        logger->info("Starting root emulator");
+        logfile << "[INFO] Starting root emulator" << std::endl;
         handle_requests();
     }
 
     // Stop the emulator
     void stop() {
-        logger->info("Stopping root emulator");
+        logfile << "[INFO] Stopping root emulator" << std::endl;
         running = false;
     }
 };
@@ -351,15 +328,15 @@ int main(int argc, char **argv) {
         g_root_emulator = std::make_unique<RootEmulator>();
         
         if (is_root_user()) {
-            spdlog::warn("Running as actual root user");
+            std::cout << "[WARN] Running as actual root user" << std::endl;
         } else {
-            spdlog::info("Running in emulation mode");
+            std::cout << "[INFO] Running in emulation mode" << std::endl;
         }
 
         // Start the emulator
         g_root_emulator->start();
     } catch (const std::exception& e) {
-        spdlog::error("Fatal error: {}", e.what());
+        std::cerr << "[ERROR] Fatal error: " << e.what() << std::endl;
         return 1;
     }
 

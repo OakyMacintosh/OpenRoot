@@ -1,0 +1,103 @@
+# Build directories
+/build/
+/out/
+**/cmake-build-*/
+
+# Android build
+**/local.properties
+**/.gradle/
+**/build/
+**/captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+.project
+.classpath
+.settings/
+*.sublime-workspace
+*.sublime-project
+.vs/
+*.user
+*.suo
+*.userprefs
+*.usertasks
+*.sdf
+*.opensdf
+
+# C++ generated files
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.dylib
+*.lib
+*.a
+*.out
+*.app
+*.gch
+*.pch
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+_deps/
+
+# vcpkg
+/vcpkg_installed/
+.vcpkg/
+
+# Logs and databases
+*.log
+*.sqlite
+*.db
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Keys and credentials
+*.keystore
+*.jks
+*.key
+*.p12
+*.pem
+*.der
+keys/
+credentials/
+
+# Debug files
+*.pdb
+*.ilk
+*.exp
+*.idb
+*.map
+
+# Project specific
+/rootd/cache/
+/droid-chan/app/release/
+**/tmp/
+**/temp/
+
+# Documentation generated
+/docs/_build/
+/docs/_static/
+/docs/_templates/
